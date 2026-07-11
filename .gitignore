@@ -13,3 +13,16 @@
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
+.idea
+.vscode
+node_modules/
+dist/
+vendor/
+cache/
+.*/
+*.min.*
+*.test.*
+*.spec.*
+*.bundle.*
+*.bundle-min.*
+*.log

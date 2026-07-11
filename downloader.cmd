@@ -141,10 +141,12 @@ while true; do
 
             if [ "$qual" == "1" ]; then
                 FORMAT="bv*+ba/b"
+                EXTRA_ARGS="$EXTRA_ARGS --merge-output-format mp4"
             elif [ "$qual" == "2" ]; then
                 FORMAT="bv*"
             elif [ "$qual" == "3" ]; then
-                FORMAT="bestvideo[height<=720]+bestaudio/best"
+                FORMAT="bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]"
+                EXTRA_ARGS="$EXTRA_ARGS --merge-output-format mp4"
             elif [ "$qual" == "4" ]; then
                 FORMAT="ba/b"
                 EXTRA_ARGS="$EXTRA_ARGS --extract-audio --audio-format mp3 --audio-quality 0"
@@ -167,7 +169,12 @@ while true; do
                 YTDLP_EXEC="/usr/local/bin/yt-dlp"
             fi
 
-            "$YTDLP_EXEC" -f "$FORMAT" $EXTRA_ARGS -o "$outdir/%(uploader)s - %(title).150B.%(ext)s" --restrict-filenames --ignore-errors "$url"
+            FFMPEG_LOC=""
+            if command -v ffmpeg &> /dev/null; then
+                FFMPEG_LOC="--ffmpeg-location $(command -v ffmpeg)"
+            fi
+
+            "$YTDLP_EXEC" -f "$FORMAT" $EXTRA_ARGS $FFMPEG_LOC -o "$outdir/%(uploader)s - %(title).150B.%(ext)s" --restrict-filenames --ignore-errors "$url"
             
             echo ""
             echo "[✓] Tarefa concluída!"
@@ -429,15 +436,17 @@ set "FORMAT="
 
 if "!qual!"=="1" (
     set "FORMAT=bv*+ba/b"
+    set EXTRA_ARGS=!EXTRA_ARGS! --merge-output-format mp4
 ) else (
     if "!qual!"=="2" (
         set "FORMAT=bv*"
     ) else (
         if "!qual!"=="3" (
-            set "FORMAT=bestvideo[height<=720]+bestaudio/best"
+            set "FORMAT=bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]"
+            set EXTRA_ARGS=!EXTRA_ARGS! --merge-output-format mp4
         ) else (
             if "!qual!"=="4" (
-                set "FORMAT=bestaudio/best"
+                set "FORMAT=ba/b"
                 set EXTRA_ARGS=!EXTRA_ARGS! --extract-audio --audio-format mp3 --audio-quality 0
             ) else (
                 echo [!] Opcao invalida.
@@ -452,20 +461,6 @@ if "!OPT_SPONSOR!"=="S" set EXTRA_ARGS=!EXTRA_ARGS! --sponsorblock-remove all
 if "!OPT_SUBS!"=="S" set EXTRA_ARGS=!EXTRA_ARGS! --write-subs --embed-subs --sub-langs "pt,en.*"
 if "!OPT_METADATA!"=="S" set EXTRA_ARGS=!EXTRA_ARGS! --add-metadata --embed-thumbnail
 
-echo.
-echo [?] Como deseja lidar com playlists?
-echo [1] Baixar tudo (Playlist completa)
-echo [2] Apenas o video do link
-set "is_playlist="
-set /p "is_playlist=Escolha (1/2): "
-if not defined is_playlist set "is_playlist=2"
-set "is_playlist=!is_playlist:"=!"
-if "!is_playlist!"=="1" (
-    set EXTRA_ARGS=!EXTRA_ARGS! --yes-playlist
-) else (
-    set EXTRA_ARGS=!EXTRA_ARGS! --no-playlist
-)
-
 set EXTRA_ARGS=!EXTRA_ARGS! --restrict-filenames
 
 echo.
@@ -478,7 +473,12 @@ if not exist "!YTDLP_BIN!" (
     set "YTDLP_BIN=yt-dlp"
 )
 
-"!YTDLP_BIN!" -f "!FORMAT!" !EXTRA_ARGS! -o "!outdir!\%%(uploader)s - %%(title).150B.%%(ext)s" --ignore-errors "!url!"
+set "FFMPEG_ARG="
+if defined FFMPEG_PATH (
+    set "FFMPEG_ARG=--ffmpeg-location "!FFMPEG_PATH!""
+)
+
+"!YTDLP_BIN!" -f "!FORMAT!" !EXTRA_ARGS! !FFMPEG_ARG! -o "!outdir!\%%(uploader)s - %%(title).150B.%%(ext)s" --ignore-errors "!url!"
 
 if errorlevel 1 (
     echo.
@@ -642,6 +642,12 @@ exit /b 0
 where curl >nul 2>nul
 if errorlevel 1 exit /b 1
 
+set "FFMPEG_PATH="
+where ffmpeg >nul 2>nul
+if not errorlevel 1 (
+    for /f "tokens=*" %%i in ('where ffmpeg') do set "FFMPEG_PATH=%%i"
+)
+
 where yt-dlp >nul 2>nul
 if not errorlevel 1 (
     set "YTDLP_BIN=yt-dlp"
@@ -660,16 +666,20 @@ if not errorlevel 1 (
     )
 )
 
-where ffmpeg >nul 2>nul
-if errorlevel 1 (
+if not defined FFMPEG_PATH (
     if exist "%LOCALAPPDATA%\Microsoft\WinGet\Links\ffmpeg.exe" (
+        set "FFMPEG_PATH=%LOCALAPPDATA%\Microsoft\WinGet\Links\ffmpeg.exe"
         set "PATH=!PATH!;%LOCALAPPDATA%\Microsoft\WinGet\Links"
     ) else (
         echo [!] FFmpeg nao encontrado.
+        echo [INFO] Sem o FFmpeg, videos podem ser baixados sem som ou em baixa qualidade.
         set /p "instf=Instalar FFmpeg via WinGet? (S/N): "
         if /i "!instf!"=="S" (
             cmd /c "winget install --id=Gyan.FFmpeg -e --accept-package-agreements --accept-source-agreements"
-            set "PATH=!PATH!;%LOCALAPPDATA%\Microsoft\WinGet\Links"
+            if exist "%LOCALAPPDATA%\Microsoft\WinGet\Links\ffmpeg.exe" (
+                set "FFMPEG_PATH=%LOCALAPPDATA%\Microsoft\WinGet\Links\ffmpeg.exe"
+                set "PATH=!PATH!;%LOCALAPPDATA%\Microsoft\WinGet\Links"
+            )
         )
     )
 )

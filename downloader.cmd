@@ -21,10 +21,11 @@ while true; do
     echo "[1] Baixar Vídeos / Músicas"
     echo "[2] Limpeza (Apagar Mídias ou Desinstalar)"
     echo "[3] Configurações (SponsorBlock, Legendas, etc.)"
-    echo "[4] Atualizar yt-dlp"
-    echo "[5] Sair"
+    echo "[4] Gerenciar Dependências (yt-dlp, FFmpeg)"
+    echo "[5] Atualizar yt-dlp"
+    echo "[6] Sair"
     echo ""
-    read -p "Escolha uma opção (1-5): " opcao
+    read -p "Escolha uma opção (1-6): " opcao
 
     case $opcao in
         1)
@@ -140,12 +141,12 @@ while true; do
             read -p "Sua escolha (1/2/3/4): " qual
 
             if [ "$qual" == "1" ]; then
-                FORMAT="bv*+ba/b"
+                FORMAT="bestvideo+bestaudio/best"
                 EXTRA_ARGS="$EXTRA_ARGS --merge-output-format mp4"
             elif [ "$qual" == "2" ]; then
-                FORMAT="bv*"
+                FORMAT="bestvideo"
             elif [ "$qual" == "3" ]; then
-                FORMAT="bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]"
+                FORMAT="bestvideo[height<=720]+bestaudio/best[height<=720]/best"
                 EXTRA_ARGS="$EXTRA_ARGS --merge-output-format mp4"
             elif [ "$qual" == "4" ]; then
                 FORMAT="ba/b"
@@ -169,9 +170,11 @@ while true; do
                 YTDLP_EXEC="/usr/local/bin/yt-dlp"
             fi
 
-            FFMPEG_LOC=""
             if command -v ffmpeg &> /dev/null; then
                 FFMPEG_LOC="--ffmpeg-location $(command -v ffmpeg)"
+            else
+                # Fallback para combined format se ffmpeg não for encontrado
+                FORMAT="best"
             fi
 
             "$YTDLP_EXEC" -f "$FORMAT" $EXTRA_ARGS $FFMPEG_LOC -o "$outdir/%(uploader)s - %(title).150B.%(ext)s" --restrict-filenames --ignore-errors "$url"
@@ -285,13 +288,51 @@ while true; do
             ;;
         4)
             clear
+            echo "--- GERENCIAR DEPENDÊNCIAS ---"
+            
+            # Verificação de yt-dlp
+            if command -v yt-dlp &> /dev/null; then
+                echo "[OK] yt-dlp: Instalado ($(yt-dlp --version))"
+            else
+                echo "[!] yt-dlp: NÃO ENCONTRADO"
+            fi
+
+            # Verificação de FFmpeg
+            if command -v ffmpeg &> /dev/null; then
+                echo "[OK] FFmpeg: Instalado"
+            else
+                echo "[!] FFmpeg: NÃO ENCONTRADO"
+            fi
+
+            echo ""
+            echo "[1] Instalar/Atualizar yt-dlp"
+            echo "[2] Instalar FFmpeg"
+            echo "[3] Voltar"
+            read -p "Escolha: " dep_op
+
+            if [ "$dep_op" == "1" ]; then
+                sudo curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
+                sudo chmod a+rx /usr/local/bin/yt-dlp
+                echo "[OK] yt-dlp processado."
+            elif [ "$dep_op" == "2" ]; then
+                if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+                    sudo apt-get update -qq && sudo apt-get install -y ffmpeg -qq
+                elif [[ "$OSTYPE" == "darwin"* ]]; then
+                    brew install ffmpeg -q
+                fi
+                echo "[OK] FFmpeg processado."
+            fi
+            read -p "Pressione ENTER para continuar..." dummy
+            ;;
+        5)
+            clear
             echo "[SISTEMA] Verificando atualizações para yt-dlp..."
             YTDLP_EXEC="yt-dlp"
             if [ -f "/usr/local/bin/yt-dlp" ]; then YTDLP_EXEC="/usr/local/bin/yt-dlp"; fi
             sudo "$YTDLP_EXEC" -U
             read -p "Pressione ENTER para continuar..." dummy
             ;;
-        5)
+        6)
             echo "Encerrando..."
             exit 0
             ;;
@@ -321,11 +362,12 @@ echo.
 echo [1] Baixar Videos / Musicas
 echo [2] Limpeza (Apagar Midias ou Desinstalar)
 echo [3] Configuracoes (SponsorBlock, Legendas, etc.)
-echo [4] Atualizar yt-dlp
-echo [5] Sair
+echo [4] Gerenciar Dependencias (yt-dlp, FFmpeg)
+echo [5] Atualizar yt-dlp
+echo [6] Sair
 echo.
 set "opcao="
-set /p "opcao=Escolha uma opcao (1-5): "
+set /p "opcao=Escolha uma opcao (1-6): "
 
 if not defined opcao goto menu_principal
 set "opcao=!opcao:"=!"
@@ -333,8 +375,9 @@ set "opcao=!opcao:"=!"
 if "!opcao!"=="1" goto baixar_midia
 if "!opcao!"=="2" goto menu_limpeza
 if "!opcao!"=="3" goto menu_config
-if "!opcao!"=="4" goto atualizar_ytdlp
-if "!opcao!"=="5" exit /b
+if "!opcao!"=="4" goto menu_deps
+if "!opcao!"=="5" goto atualizar_ytdlp
+if "!opcao!"=="6" exit /b
 goto menu_principal
 
 :baixar_midia
@@ -398,7 +441,7 @@ set "url=!url:"=!"
 
 set "EXTRA_ARGS="
 set "IS_PL_LINK=N"
-echo !url! | findstr /i "list= /playlist?" >nul
+echo "!url!" | findstr /i "list= /playlist?" >nul
 if not errorlevel 1 set "IS_PL_LINK=S"
 
 if "!IS_PL_LINK!"=="S" (
@@ -435,14 +478,14 @@ set "qual=!qual:"=!"
 set "FORMAT="
 
 if "!qual!"=="1" (
-    set "FORMAT=bv*+ba/b"
+    set "FORMAT=bestvideo+bestaudio/best"
     set EXTRA_ARGS=!EXTRA_ARGS! --merge-output-format mp4
 ) else (
     if "!qual!"=="2" (
-        set "FORMAT=bv*"
+        set "FORMAT=bestvideo"
     ) else (
         if "!qual!"=="3" (
-            set "FORMAT=bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]"
+            set "FORMAT=bestvideo[height<=720]+bestaudio/best[height<=720]/best"
             set EXTRA_ARGS=!EXTRA_ARGS! --merge-output-format mp4
         ) else (
             if "!qual!"=="4" (
@@ -476,6 +519,10 @@ if not exist "!YTDLP_BIN!" (
 set "FFMPEG_ARG="
 if defined FFMPEG_PATH (
     set "FFMPEG_ARG=--ffmpeg-location "!FFMPEG_PATH!""
+) else (
+    rem Fallback para combined format se ffmpeg nao for encontrado
+    if "!qual!"=="1" set "FORMAT=best"
+    if "!qual!"=="3" set "FORMAT=best[height<=720]"
 )
 
 "!YTDLP_BIN!" -f "!FORMAT!" !EXTRA_ARGS! !FFMPEG_ARG! -o "!outdir!\%%(uploader)s - %%(title).150B.%%(ext)s" --ignore-errors "!url!"
@@ -621,6 +668,58 @@ if "!opc!"=="4" (
     echo [OK] Configuracoes resetadas.
     timeout /t 1 >nul
     goto menu_config
+)
+goto menu_principal
+
+:menu_deps
+cls
+echo ==================================================
+echo             GERENCIAR DEPENDENCIAS
+echo ==================================================
+echo.
+
+set "YT_STATUS=[!] NAO ENCONTRADO"
+where yt-dlp >nul 2>nul
+if not errorlevel 1 (
+    for /f "tokens=*" %%v in ('yt-dlp --version') do set "YT_STATUS=[OK] Instalado (%%v)"
+) else (
+    if exist "yt-dlp.exe" (
+        for /f "tokens=*" %%v in ('.\yt-dlp.exe --version') do set "YT_STATUS=[OK] Local (%%v)"
+    )
+)
+
+set "FF_STATUS=[!] NAO ENCONTRADO"
+where ffmpeg >nul 2>nul
+if not errorlevel 1 (
+    set "FF_STATUS=[OK] Instalado"
+) else (
+    if defined FFMPEG_PATH (
+        if exist "!FFMPEG_PATH!" set "FF_STATUS=[OK] Detectado em Path Custom"
+    )
+)
+
+echo yt-dlp: !YT_STATUS!
+echo FFmpeg: !FF_STATUS!
+echo.
+echo [1] Instalar/Atualizar yt-dlp (.exe local)
+echo [2] Instalar FFmpeg (via WinGet)
+echo [3] Voltar
+echo.
+set "dep_op="
+set /p "dep_op=Escolha: "
+
+if "!dep_op!"=="1" (
+    echo [SISTEMA] Baixando yt-dlp...
+    curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe -o yt-dlp.exe
+    echo [OK] yt-dlp.exe baixado/atualizado.
+    pause
+    goto menu_deps
+)
+if "!dep_op!"=="2" (
+    echo [SISTEMA] Tentando instalar FFmpeg via WinGet...
+    cmd /c "winget install --id=Gyan.FFmpeg -e --accept-package-agreements --accept-source-agreements"
+    pause
+    goto menu_deps
 )
 goto menu_principal
 

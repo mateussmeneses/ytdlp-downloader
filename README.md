@@ -12,7 +12,8 @@ O foco deste projeto é a **Transparência e a Fluidez**. O programa roda atrav�
 * **Padronização de Nomes:** Arquivos são salvos automaticamente no formato `Nome do Canal - Título do Vídeo`.
 * **Detecção Inteligente de Playlists:** O script identifica se o link é de um vídeo único ou playlist e pergunta como proceder apenas quando necessário.
 * **Persistência de Sessão:** Suas escolhas de pasta e preferência de playlist são lembradas enquanto o programa estiver aberto.
-* **Auto-instalação:** Gerencia automaticamente o `yt-dlp` e o `FFmpeg` (via `winget`, `apt` ou `brew`).
+* **Gerenciamento de Dependências:** Novo menu para verificar o status e instalar o `yt-dlp` e `FFmpeg` manualmente a qualquer momento.
+* **Auto-instalação:** Gerencia automaticamente o `yt-dlp` e o `FFmpeg` (via `winget`, `apt` ou `brew`) durante o fluxo de download.
 * **Atualização Integrada:** Opção no menu para atualizar o motor de download (`yt-dlp`) sem sair do script.
 
 ## ⚙️ Opções de Download e Configurações

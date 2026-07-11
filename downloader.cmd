@@ -5,6 +5,13 @@ goto :BATCH
 
 #!/bin/bash
 
+# Configurações padrão
+OPT_SPONSOR="N"
+OPT_SUBS="N"
+OPT_METADATA="S"
+SAVED_OUTDIR=""
+SAVED_PLAYLIST=""
+
 while true; do
     clear
     echo "=================================================="
@@ -13,9 +20,11 @@ while true; do
     echo ""
     echo "[1] Baixar Vídeos / Músicas"
     echo "[2] Limpeza (Apagar Mídias ou Desinstalar)"
-    echo "[3] Sair"
+    echo "[3] Configurações (SponsorBlock, Legendas, etc.)"
+    echo "[4] Atualizar yt-dlp"
+    echo "[5] Sair"
     echo ""
-    read -p "Escolha uma opção (1/2/3): " opcao
+    read -p "Escolha uma opção (1-5): " opcao
 
     case $opcao in
         1)
@@ -71,12 +80,19 @@ while true; do
             fi
 
             echo ""
-            read -p "Onde deseja salvar os arquivos? (Ex: /home/user/Downloads): " outdir
-            if [ -z "$outdir" ]; then
-                echo "[!] Caminho inválido."
-                read -p "Pressione ENTER para voltar ao menu..." dummy
-                continue
+            if [ -z "$SAVED_OUTDIR" ]; then
+                read -p "Onde deseja salvar os arquivos? (Ex: /home/user/Downloads): " outdir
+                if [ -z "$outdir" ]; then
+                    echo "[!] Caminho inválido."
+                    read -p "Pressione ENTER para voltar ao menu..." dummy
+                    continue
+                fi
+                SAVED_OUTDIR="$outdir"
+            else
+                outdir="$SAVED_OUTDIR"
+                echo "[SISTEMA] Pasta de destino: $outdir"
             fi
+
             if [ ! -d "$outdir" ]; then
                 echo "[SISTEMA] Criando pasta: $outdir"
                 mkdir -p "$outdir"
@@ -90,6 +106,32 @@ while true; do
                 continue
             fi
 
+            # Detecção de Playlist
+            EXTRA_ARGS=""
+            IS_PL_LINK="N"
+            if [[ "$url" == *"list="* || "$url" == *"/playlist?"* ]]; then
+                IS_PL_LINK="S"
+            fi
+
+            if [ "$IS_PL_LINK" == "S" ]; then
+                if [ -z "$SAVED_PLAYLIST" ]; then
+                    echo ""
+                    echo "[?] O link parece ser uma playlist."
+                    echo "[1] Baixar tudo (Playlist completa)"
+                    echo "[2] Apenas o video do link"
+                    read -p "Escolha (1/2): " pl_choice
+                    SAVED_PLAYLIST="$pl_choice"
+                fi
+                
+                if [ "$SAVED_PLAYLIST" == "1" ]; then
+                    EXTRA_ARGS="$EXTRA_ARGS --yes-playlist"
+                else
+                    EXTRA_ARGS="$EXTRA_ARGS --no-playlist"
+                fi
+            else
+                EXTRA_ARGS="$EXTRA_ARGS --no-playlist"
+            fi
+
             echo ""
             echo "[1] Melhor Qualidade (Video + Audio - MP4)"
             echo "[2] Melhor Qualidade (Somente Video)"
@@ -97,7 +139,6 @@ while true; do
             echo "[4] Apenas Audio (MP3)"
             read -p "Sua escolha (1/2/3/4): " qual
 
-            EXTRA_ARGS=""
             if [ "$qual" == "1" ]; then
                 FORMAT="bv*+ba/b"
             elif [ "$qual" == "2" ]; then
@@ -106,12 +147,16 @@ while true; do
                 FORMAT="bestvideo[height<=720]+bestaudio/best"
             elif [ "$qual" == "4" ]; then
                 FORMAT="ba/b"
-                EXTRA_ARGS="--extract-audio --audio-format mp3 --audio-quality 0"
+                EXTRA_ARGS="$EXTRA_ARGS --extract-audio --audio-format mp3 --audio-quality 0"
             else
                 echo "[!] Opção inválida."
                 read -p "Pressione ENTER para voltar ao menu..." dummy
                 continue
             fi
+
+            if [ "$OPT_SPONSOR" == "S" ]; then EXTRA_ARGS="$EXTRA_ARGS --sponsorblock-remove all"; fi
+            if [ "$OPT_SUBS" == "S" ]; then EXTRA_ARGS="$EXTRA_ARGS --write-subs --embed-subs --sub-langs pt,en.*"; fi
+            if [ "$OPT_METADATA" == "S" ]; then EXTRA_ARGS="$EXTRA_ARGS --add-metadata --embed-thumbnail"; fi
 
             echo ""
             echo "[SISTEMA] Iniciando download em: $outdir"
@@ -203,6 +248,43 @@ while true; do
             done
             ;;
         3)
+            while true; do
+                clear
+                echo "=================================================="
+                echo "             CONFIGURAÇÕES DE DOWNLOAD"
+                echo "=================================================="
+                echo "[1] SponsorBlock (Pular Intros): [$OPT_SPONSOR]"
+                echo "[2] Legendas (Baixar e Embutir): [$OPT_SUBS]"
+                echo "[3] Metadados e Capa:            [$OPT_METADATA]"
+                echo "[4] Resetar Pasta e Preferencias"
+                echo "[5] Voltar ao Menu Principal"
+                echo ""
+                read -p "Escolha uma opção para alternar (1-5): " op_conf
+                if [ "$op_conf" == "1" ]; then
+                    if [ "$OPT_SPONSOR" == "S" ]; then OPT_SPONSOR="N"; else OPT_SPONSOR="S"; fi
+                elif [ "$op_conf" == "2" ]; then
+                    if [ "$OPT_SUBS" == "S" ]; then OPT_SUBS="N"; else OPT_SUBS="S"; fi
+                elif [ "$op_conf" == "3" ]; then
+                    if [ "$OPT_METADATA" == "S" ]; then OPT_METADATA="N"; else OPT_METADATA="S"; fi
+                elif [ "$op_conf" == "4" ]; then
+                    SAVED_OUTDIR=""
+                    SAVED_PLAYLIST=""
+                    echo "[OK] Configurações resetadas."
+                    sleep 1
+                elif [ "$op_conf" == "5" ]; then
+                    break
+                fi
+            done
+            ;;
+        4)
+            clear
+            echo "[SISTEMA] Verificando atualizações para yt-dlp..."
+            YTDLP_EXEC="yt-dlp"
+            if [ -f "/usr/local/bin/yt-dlp" ]; then YTDLP_EXEC="/usr/local/bin/yt-dlp"; fi
+            sudo "$YTDLP_EXEC" -U
+            read -p "Pressione ENTER para continuar..." dummy
+            ;;
+        5)
             echo "Encerrando..."
             exit 0
             ;;
@@ -217,6 +299,11 @@ exit 0
 :BATCH
 setlocal enabledelayedexpansion
 chcp 65001 >nul 2>&1
+if not defined OPT_SPONSOR set "OPT_SPONSOR=N"
+if not defined OPT_SUBS set "OPT_SUBS=N"
+if not defined OPT_METADATA set "OPT_METADATA=S"
+if not defined SAVED_OUTDIR set "SAVED_OUTDIR="
+if not defined SAVED_PLAYLIST set "SAVED_PLAYLIST="
 
 :menu_principal
 cls
@@ -226,17 +313,21 @@ echo ==================================================
 echo.
 echo [1] Baixar Videos / Musicas
 echo [2] Limpeza (Apagar Midias ou Desinstalar)
-echo [3] Sair
+echo [3] Configuracoes (SponsorBlock, Legendas, etc.)
+echo [4] Atualizar yt-dlp
+echo [5] Sair
 echo.
 set "opcao="
-set /p "opcao=Escolha uma opcao (1/2/3): "
+set /p "opcao=Escolha uma opcao (1-5): "
 
 if not defined opcao goto menu_principal
 set "opcao=!opcao:"=!"
 
 if "!opcao!"=="1" goto baixar_midia
 if "!opcao!"=="2" goto menu_limpeza
-if "!opcao!"=="3" exit /b
+if "!opcao!"=="3" goto menu_config
+if "!opcao!"=="4" goto atualizar_ytdlp
+if "!opcao!"=="5" exit /b
 goto menu_principal
 
 :baixar_midia
@@ -258,12 +349,23 @@ if errorlevel 1 (
 )
 
 echo.
-set "outdir="
-set /p "outdir=Onde deseja salvar os arquivos? (Ex: C:\Downloads): "
-if not defined outdir (
-    echo [!] Caminho invalido.
-    pause
-    goto menu_principal
+if not defined SAVED_OUTDIR (
+    echo [DICA] Deixe em branco para abrir o seletor visual de pastas.
+    set "outdir="
+    set /p "outdir=Onde deseja salvar os arquivos? (ou ENTER para abrir seletor): "
+    if not defined outdir (
+        echo [SISTEMA] Abrindo seletor de pastas...
+        for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Selecione a pasta para salvar os downloads'; if($f.ShowDialog() -eq 'OK'){ $f.SelectedPath }"`) do set "outdir=%%I"
+    )
+    if not defined outdir (
+        echo [!] Nenhuma pasta selecionada ou caminho invalido.
+        pause
+        goto menu_principal
+    )
+    set "SAVED_OUTDIR=!outdir!"
+) else (
+    set "outdir=!SAVED_OUTDIR!"
+    echo [SISTEMA] Pasta de destino: !outdir!
 )
 set "outdir=!outdir:"=!"
 
@@ -287,6 +389,32 @@ if not defined url (
 )
 set "url=!url:"=!"
 
+set "EXTRA_ARGS="
+set "IS_PL_LINK=N"
+echo !url! | findstr /i "list= /playlist?" >nul
+if not errorlevel 1 set "IS_PL_LINK=S"
+
+if "!IS_PL_LINK!"=="S" (
+    if not defined SAVED_PLAYLIST (
+        echo.
+        echo [?] O link parece ser uma playlist.
+        echo [1] Baixar tudo (Playlist completa)
+        echo [2] Apenas o video do link
+        set "pl_choice="
+        set /p "pl_choice=Escolha (1/2): "
+        if not defined pl_choice set "pl_choice=2"
+        set "SAVED_PLAYLIST=!pl_choice!"
+    )
+    
+    if "!SAVED_PLAYLIST!"=="1" (
+        set EXTRA_ARGS=!EXTRA_ARGS! --yes-playlist
+    ) else (
+        set EXTRA_ARGS=!EXTRA_ARGS! --no-playlist
+    )
+) else (
+    set EXTRA_ARGS=!EXTRA_ARGS! --no-playlist
+)
+
 echo.
 echo [1] Melhor Qualidade (Video + Audio - MP4)
 echo [2] Melhor Qualidade (Somente Video)
@@ -297,7 +425,6 @@ set /p "qual=Sua escolha (1/2/3/4): "
 if not defined qual goto menu_principal
 set "qual=!qual:"=!"
 
-set "EXTRA_ARGS="
 set "FORMAT="
 
 if "!qual!"=="1" (
@@ -311,7 +438,7 @@ if "!qual!"=="1" (
         ) else (
             if "!qual!"=="4" (
                 set "FORMAT=bestaudio/best"
-                set EXTRA_ARGS=--extract-audio --audio-format mp3 --audio-quality 0
+                set EXTRA_ARGS=!EXTRA_ARGS! --extract-audio --audio-format mp3 --audio-quality 0
             ) else (
                 echo [!] Opcao invalida.
                 pause
@@ -320,6 +447,10 @@ if "!qual!"=="1" (
         )
     )
 )
+
+if "!OPT_SPONSOR!"=="S" set EXTRA_ARGS=!EXTRA_ARGS! --sponsorblock-remove all
+if "!OPT_SUBS!"=="S" set EXTRA_ARGS=!EXTRA_ARGS! --write-subs --embed-subs --sub-langs "pt,en.*"
+if "!OPT_METADATA!"=="S" set EXTRA_ARGS=!EXTRA_ARGS! --add-metadata --embed-thumbnail
 
 echo.
 echo [?] Como deseja lidar com playlists?
@@ -450,12 +581,57 @@ if exist "yt-dlp.exe" (
 where winget >nul 2>nul
 if not errorlevel 1 (
     echo [AVISO] Uma janela do Windows (UAC) pode aparecer.
-    call winget uninstall --id=Gyan.FFmpeg --silent || call winget uninstall --id=Gyan.FFmpeg
+    cmd /c "winget uninstall --id=Gyan.FFmpeg --silent" || cmd /c "winget uninstall --id=Gyan.FFmpeg"
 ) else (
     echo [!] 'winget' nao encontrado. Nao foi possivel desinstalar o FFmpeg automaticamente.
 )
+echo.
+echo [SISTEMA] Processo de limpeza/desinstalacao concluido.
 pause
 goto menu_limpeza
+
+:menu_config
+cls
+echo ==================================================
+echo             CONFIGURACOES DE DOWNLOAD
+echo ==================================================
+echo [1] SponsorBlock (Pular Intros/Sponsors): [!OPT_SPONSOR!]
+echo [2] Legendas (Baixar e Embutir pt/en):    [!OPT_SUBS!]
+echo [3] Metadados e Capa (Thumbnails):       [!OPT_METADATA!]
+echo [4] Resetar Pasta e Preferencias
+echo [5] Voltar
+echo.
+set "opc="
+set /p "opc=Escolha uma opcao para alternar (1-5): "
+if "!opc!"=="1" (
+    if "!OPT_SPONSOR!"=="S" (set "OPT_SPONSOR=N") else (set "OPT_SPONSOR=S")
+    goto menu_config
+)
+if "!opc!"=="2" (
+    if "!OPT_SUBS!"=="S" (set "OPT_SUBS=N") else (set "OPT_SUBS=S")
+    goto menu_config
+)
+if "!opc!"=="3" (
+    if "!OPT_METADATA!"=="S" (set "OPT_METADATA=N") else (set "OPT_METADATA=S")
+    goto menu_config
+)
+if "!opc!"=="4" (
+    set "SAVED_OUTDIR="
+    set "SAVED_PLAYLIST="
+    echo [OK] Configuracoes resetadas.
+    timeout /t 1 >nul
+    goto menu_config
+)
+goto menu_principal
+
+:atualizar_ytdlp
+cls
+echo [SISTEMA] Verificando atualizacoes para yt-dlp...
+if not exist "!YTDLP_BIN!" set "YTDLP_BIN=yt-dlp"
+call "!YTDLP_BIN!" -U
+echo.
+pause
+goto menu_principal
 
 :check_internet
 ping -n 1 github.com >nul 2>&1
@@ -492,7 +668,7 @@ if errorlevel 1 (
         echo [!] FFmpeg nao encontrado.
         set /p "instf=Instalar FFmpeg via WinGet? (S/N): "
         if /i "!instf!"=="S" (
-            call winget install --id=Gyan.FFmpeg -e --accept-package-agreements --accept-source-agreements
+            cmd /c "winget install --id=Gyan.FFmpeg -e --accept-package-agreements --accept-source-agreements"
             set "PATH=!PATH!;%LOCALAPPDATA%\Microsoft\WinGet\Links"
         )
     )
